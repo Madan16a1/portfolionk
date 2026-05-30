@@ -22,6 +22,15 @@ function SendIcon() {
   );
 }
 
+function ErrorIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4" aria-hidden="true">
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4v4M8 12h.01" />
+    </svg>
+  );
+}
+
 interface FormState {
   name: string;
   email: string;
@@ -34,21 +43,55 @@ export default function Contact() {
     name: "", email: "", subject: "", message: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setError(null);
   };
 
-  const handleSubmit = () => {
-    if (!form.name || !form.email || !form.message) return;
-    // In production: wire to API route or service (Resend, Formspree, etc.)
-    setSubmitted(true);
-  };
+  const handleSubmit = async () => {
+    if (!form.name || !form.email || !form.message) {
+      setError("Please fill in all required fields.");
+      return;
+    }
 
-  const inputClass =
-    "w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] px-4 py-3.5 text-[var(--text-primary)] font-light text-[14px] outline-none transition-[border-color,background] duration-200 focus:border-[var(--accent)] focus:bg-[var(--bg-3)] placeholder:text-[var(--text-tertiary)] font-sans";
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          access_key: "140eb7d9-d2b9-444b-9ea2-860dd4ce1ff6",
+          name: form.name,
+          email: form.email,
+          subject: form.subject,
+          message: form.message,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSubmitted(true);
+        setForm({ name: "", email: "", subject: "", message: "" });
+      } else {
+        setError(data.message || "Failed to send message. Please try again.");
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again later.");
+      console.error("Form submission error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <section id="contact" className="py-[120px] bg-[var(--bg-2)]" aria-label="Contact">
@@ -101,6 +144,19 @@ export default function Contact() {
               </div>
             ) : (
               <div className="flex flex-col gap-4" role="form" aria-label="Contact form">
+                {error && (
+                  <div className="flex flex-col gap-3 p-4 rounded-[8px] bg-[rgba(255,59,48,0.1)] border border-[rgba(255,59,48,0.2)]" role="alert">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 flex-shrink-0 rounded-full bg-[rgba(255,59,48,0.15)] border border-[rgba(255,59,48,0.3)] flex items-center justify-center mt-0.5">
+                        <ErrorIcon />
+                      </div>
+                      <p className="text-[13px] font-light text-[rgba(255,255,255,0.8)] leading-[1.6]">
+                        {error}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-2">
                     <label htmlFor="name" className="font-mono text-[11px] tracking-[0.1em] text-[var(--text-tertiary)] uppercase">
@@ -110,11 +166,12 @@ export default function Contact() {
                       id="name"
                       name="name"
                       type="text"
-                      className={inputClass}
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] px-4 py-3.5 text-[var(--text-primary)] font-light text-[14px] outline-none transition-[border-color,background] duration-200 focus:border-[var(--accent)] focus:bg-[var(--bg-3)] placeholder:text-[var(--text-tertiary)] font-sans disabled:opacity-50"
                       placeholder="Your name"
                       value={form.name}
                       onChange={handleChange}
                       autoComplete="name"
+                      disabled={loading}
                     />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -125,11 +182,12 @@ export default function Contact() {
                       id="email"
                       name="email"
                       type="email"
-                      className={inputClass}
+                      className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] px-4 py-3.5 text-[var(--text-primary)] font-light text-[14px] outline-none transition-[border-color,background] duration-200 focus:border-[var(--accent)] focus:bg-[var(--bg-3)] placeholder:text-[var(--text-tertiary)] font-sans disabled:opacity-50"
                       placeholder="your@email.com"
                       value={form.email}
                       onChange={handleChange}
                       autoComplete="email"
+                      disabled={loading}
                     />
                   </div>
                 </div>
@@ -142,10 +200,11 @@ export default function Contact() {
                     id="subject"
                     name="subject"
                     type="text"
-                    className={inputClass}
+                    className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] px-4 py-3.5 text-[var(--text-primary)] font-light text-[14px] outline-none transition-[border-color,background] duration-200 focus:border-[var(--accent)] focus:bg-[var(--bg-3)] placeholder:text-[var(--text-tertiary)] font-sans disabled:opacity-50"
                     placeholder="What's this about?"
                     value={form.subject}
                     onChange={handleChange}
+                    disabled={loading}
                   />
                 </div>
 
@@ -156,10 +215,11 @@ export default function Contact() {
                   <textarea
                     id="message"
                     name="message"
-                    className={`${inputClass} min-h-[120px] resize-none`}
+                    className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-[8px] px-4 py-3.5 text-[var(--text-primary)] font-light text-[14px] outline-none transition-[border-color,background] duration-200 focus:border-[var(--accent)] focus:bg-[var(--bg-3)] placeholder:text-[var(--text-tertiary)] font-sans min-h-[120px] resize-none disabled:opacity-50"
                     placeholder="Tell me about your project, timeline, and goals..."
                     value={form.message}
                     onChange={handleChange}
+                    disabled={loading}
                   />
                 </div>
 
@@ -168,9 +228,19 @@ export default function Contact() {
                   onClick={handleSubmit}
                   className="mt-2 self-start"
                   ariaLabel="Send message"
+                  disabled={loading}
                 >
-                  Send message
-                  <SendIcon />
+                  {loading ? (
+                    <>
+                      <span className="inline-block animate-spin">◆</span>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      Send message
+                      <SendIcon />
+                    </>
+                  )}
                 </Button>
               </div>
             )}
